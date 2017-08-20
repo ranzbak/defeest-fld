@@ -6,6 +6,9 @@
 // About: Simple FLD effect to bounce a bitmap logo
 //
 
+// Raster debug ?
+.const DEBUG = 0
+
 BasicUpstart2(begin)				// <- This creates a basic sys line that can start your program
 
 // common register definitions
@@ -32,7 +35,7 @@ BasicUpstart2(begin)				// <- This creates a basic sys line that can start your 
 *=$1C00	"ColorRam:"; colorRam: 	.fill picture.getColorRamSize(), picture.getColorRam(i)
 *=$2000	"Bitmap";				.fill picture.getBitmapSize(), picture.getBitmap(i)
 
-* = $1000 "Main Program"    
+* = $1000 "Main Program"
 // Let the code begin
 begin:
 	// create initial interrupt
@@ -78,11 +81,11 @@ begin:
 !loop:
 	lda checkboard_sprite, x
 	sta $0800, x
-	inx 
+	inx
 	cpx #63
 	bne !loop-
 
-	ldy #11					// Sprite colors to gray
+	ldy #$0E					// Sprite colors to gray
 	sty $D027
 	sty $D028
 	sty $D029
@@ -101,11 +104,11 @@ begin:
 	sty $D00B				// Set y for sprite 5
 	sty $D00D				// Set y for sprite 6
 	sty $D00F				// Set y for sprite 6
-	
+
 	ldx #0					// Set X position of sprite 0
 	stx $D000
 	ldx #48					// Set X position of sprite 1
-	stx $D002			
+	stx $D002
 	ldx #96				// Set X position of sprite 2
 	stx $D004
 	ldx #124				// Set X position of sprite 3
@@ -164,7 +167,7 @@ sync_intro:
 	sta REG_BGCOLOUR
 	ldx #0
 
-	loop1:		
+	loop1:
 	.for (var i=0; i<4; i++) {
 		lda colorRam+i*$100,x
 		sta $d800+i*$100,x
@@ -191,9 +194,9 @@ sync_intro:
 
 	ldx #00													// Copy header text to screen
 !loop:
-	lda header_text, x	
-	beq !over+	
-	sta $0400, x	
+	lda header_text, x
+	beq !over+
+	sta $0400, x
 	lda footer_text, x
 	sta $680, x
 	inx
@@ -246,6 +249,10 @@ wait_bitmap_top_fld:
 !loop:
 	cmp REG_RASTERLINE							// Busy wait for raster line to change
 	beq !loop-
+.if (DEBUG==1) {
+	lda #$05
+	sta $d020
+}
 	lda REG_SCREENCTL_1
 	adc #001                        // delay next bad scan line
 	and #007
@@ -272,6 +279,10 @@ bitmap_top_fld_done:
 	lda #$d8                        // switch multi colour mode on
 	sta REG_SCREENCTL_2
 
+.if (DEBUG==1) {
+	lda #$00
+	sta $d020
+}
 	jmp hook_sprite_multi
 
 // multiplex sprites half way ------------------------------------------------------------------]
@@ -279,7 +290,7 @@ bitmap_top_fld_done:
 
 hook_sprite_multi:
 	lda #115
-	ldx #<sprite_multi	
+	ldx #<sprite_multi
 	ldy #>sprite_multi
 	jmp apply_interrupt
 
@@ -312,6 +323,10 @@ wait_bitmap_bot_fld:
 	lda REG_RASTERLINE
 	cmp REG_RASTERLINE
 	beq wait_bitmap_bot_fld + 3
+.if (DEBUG==1) {
+	lda #$04
+	sta $d020
+}
 	lda REG_SCREENCTL_1
 	adc #001
 	and #007
@@ -348,6 +363,10 @@ latch_final_bitmap_line:
 	sty $D00D				// Set y for sprite 6
 	sty $D00F				// Set y for sprite 6
 
+.if (DEBUG==1) {
+	ldy #$00
+	sty $d020
+}
 	jmp hook_update_logo_fld
 
 
@@ -363,6 +382,13 @@ hook_update_logo_fld:
 
 update_logo_fld:
 	inc REG_INTFLAG
+
+.if (DEBUG==1) {
+	lda #$01
+	sta $d020
+}
+
+	jsr update_x_sprite_anim								// Update X sprite position, the jumps are to far, so subroutine
 
 	dec logo_bounce_delay                   // smooth logo bounce effect
 	bne update_logo_fld_done
@@ -387,9 +413,12 @@ update_logo_fld:
 	sbc render_bitmap_start + 1							// 16 - start-lines > end lines to shift.
 	sta render_bitmap_end + 1
 
-	jsr update_x_sprite_anim								// Update X sprite position
 
 update_logo_fld_done:
+.if (DEBUG==1) {
+	lda #$00
+	sta $d020
+}
 	jmp hook_init_frame_fld
 
 // Update the X sprite animation----------------------------------------------------------------]
@@ -397,17 +426,16 @@ update_logo_fld_done:
 update_x_sprite_anim:
 	// Count back from 0 to 48 in loop
 	ldx back_run_pos												// Get animation position
-	inx 
+	inx
 	txa
 	cmp #48																	// loop at 47 range is 0-47
 	bne !over+
-	ldx #00																	// Reset					
+	ldx #00																	// Reset
 !over:
 	stx back_run_pos												// Store animation position
+	lda x_sprite_cos_pos, x
+	tax
 
-//	lda #48																	// Invert counter
-//	sbc back_run_pos
-//	tax
 
 	// The last sprite always has bit 8 set
 	lda #%10000000
@@ -416,7 +444,7 @@ update_x_sprite_anim:
 	// Set the initial seed number to the sprite register
 	txa
 	clc
-	sbc #28												// The sprite should move from (-28 to 20)
+	sbc #28																	// The sprite should move from (-28 to 20)
 	bcs !cs+
 	clc
 	sta temp_run_pos
@@ -427,44 +455,44 @@ update_x_sprite_anim:
 	sta $d010
 	lda temp_run_pos
 !cs:
-	sta temp_run_pos							// Else
+	sta temp_run_pos												// Else
 	clc
 	sbc #38
 	bcs !cc+
 	lda temp_run_pos
-	sta $D000											// Sprite 0 -20 - 28
+	sta $D000																// Sprite 0 -20 - 28
 !cc:
-	lda temp_run_pos	
+	lda temp_run_pos
 	clc
-	adc #47					// 48 pixels futher
-	sta $D002				// Sprite 1	28 - 56
+	adc #48																	// 48 pixels futher
+	sta $D002																// Sprite 1	28 - 56
 	clc
-	adc #47					// again 
-	sta $D004				// Sprite 2 56 - 104
+	adc #48																	// again
+	sta $D004																// Sprite 2 56 - 104
 	clc
-	adc #47					// again
-	sta $D006				// Sprite 3 104 - 152
+	adc #48																	// again
+	sta $D006																// Sprite 3 104 - 152
 	clc
-	adc #47					// again
-	sta $D008				// Sprite 4 152 - 200
+	adc #48																	// again
+	sta $D008																// Sprite 4 152 - 200
 	clc
-	adc #47					// again
-	sta $D00A				// Sprite 5	200 - 248
+	adc #48																	// again
+	sta $D00A																// Sprite 5	200 - 248
 	clc
-	adc #47					// again
+	adc #48																	// again
 	bcc !cc+
 	pha
 	lda $d010
-	ora #%01000000	
+	ora #%01000000
 	sta $d010
 	pla
 !cc:
-	sta $D00C				// sprite 6 248 - 296
+	sta $D00C																// sprite 6 248 - 296
 	clc
-	adc #47					// again
-	sta $D00E				// sprite 7	296 - 344
-	
-	rts							// Return
+	adc #48																	// again
+	sta $D00E																// sprite 7	296 - 344
+
+	rts
 
 
 // variables -----------------------------------------------------------------------------------]
@@ -489,24 +517,36 @@ footer_text:
 
 // Data
 checkboard_sprite:
-.byte 255,255,255
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 255,255,255
-.byte 255,255,255
-.byte 255,255,255
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 128,24,1
-.byte 255,255,255
+// Arrows
+.byte 134,24,97
+.byte 195,12,48
+.byte 97,134,24
+.byte 48,195,12
+.byte 24,97,134
+.byte 12,48,195
+.byte 134,24,97
+.byte 195,12,48
+.byte 97,134,24
+.byte 48,195,12
+.byte 154,105,166
+.byte 48,195,12
+.byte 97,134,24
+.byte 195,12,48
+.byte 134,24,97
+.byte 12,48,195
+.byte 24,97,134
+.byte 48,195,12
+.byte 97,134,24
+.byte 195,12,48
+.byte 134,24,97
+
+// Cosine to animate sprite background
+x_sprite_cos_pos:
+.var i=0
+.var len=48
+bounce:
+.while (i++<len) {
+	.var x = round(24-(12*cos((i*(PI*2))/len))+(12*cos((i*(PI))/len)))
+  .print x
+  .byte x
+}
