@@ -87,6 +87,8 @@ begin:
 !loop:
 	lda checkboard_sprite, x
 	sta $0800, x
+	lda scroller_back_top, x
+	sta $0800 + 64, x
 	inx
 	cpx #63
 	bne !loop-
@@ -100,6 +102,12 @@ begin:
 	sty $D02C
 	sty $D02D
 	sty $D02E
+
+	ldy #$0B
+	sty $D025
+
+	ldy #$0C
+	sty $D026
 
 	ldy #80					// Set Y position of sprite
 	sty $D001				// Set y for sprite 0
@@ -115,7 +123,7 @@ begin:
 	stx $D000
 	ldx #48					// Set X position of sprite 1
 	stx $D002
-	ldx #96				// Set X position of sprite 2
+	ldx #96					// Set X position of sprite 2
 	stx $D004
 	ldx #124				// Set X position of sprite 3
 	stx $D006
@@ -287,6 +295,24 @@ bitmap_top_fld_done:
 	lda #$d8                        // switch multi colour mode on
 	sta REG_SCREENCTL_2
 
+	lda #$20												// Set sprites back to position 32
+	sta $7f8
+	sta $ff8
+	sta $7f9
+	sta $ff9
+	sta $7fa
+	sta $ffa
+	sta $7fb
+	sta $ffb
+	sta $7fc
+	sta $ffc
+	sta $7fd
+	sta $ffd
+	sta $7fe
+	sta $ffe
+	sta $7ff
+	sta $fff
+
 .if (DEBUG==1) {
 	lda #$00
 	sta $d020
@@ -371,8 +397,41 @@ latch_final_bitmap_line:
 	lda #200                        // multi colour mode off
 	sta REG_SCREENCTL_2
 
-	// Sprites back to top
-	ldy #80													// Set Y position of sprite
+	// Set sprites to the scroller background
+	lda #$21												// Set sprites back to position 33
+	sta $7f8
+	sta $ff8
+	sta $7f9
+	sta $ff9
+	sta $7fa
+	sta $ffa
+	sta $7fb
+	sta $ffb
+	sta $7fc
+	sta $ffc
+	sta $7fd
+	sta $ffd
+	sta $7fe
+	sta $ffe
+	sta $7ff
+	sta $fff
+
+	// Enable multicolor mode sprite 0-7
+	ldy #$ff
+	sty $D01C
+
+	ldy #$0F												// Sprite colors to gray
+	sty $D027
+	sty $D028
+	sty $D029
+	sty $D02A
+	sty $D02B
+	sty $D02C
+	sty $D02D
+	sty $D02E
+
+	// Set scroller background
+	ldy #210												// Set Y position of sprite
 	sty $D001												// Set y for sprite 0
 	sty $D003												// Set y for sprite 1
 	sty $D005												// Set y for sprite 2
@@ -380,7 +439,7 @@ latch_final_bitmap_line:
 	sty $D009												// Set y for sprite 4
 	sty $D00B												// Set y for sprite 5
 	sty $D00D												// Set y for sprite 6
-	sty $D00F												// Set y for sprite 6
+	sty $D00F												// Set y for sprite 7
 
 .if (DEBUG==1) {
 	ldy #$00
@@ -470,8 +529,34 @@ update_logo_fld:
 	sbc render_bitmap_start + 1							// 16 - start-lines > end lines to shift.
 	sta render_bitmap_end + 1
 
-
 update_logo_fld_done:
+	// Disable multicolor mode Sprite 0-7
+	ldy #$00
+	sty $D01C
+
+
+	// Set logo background Sprites back to top
+	ldy #80													// Set Y position of sprite
+	sty $D001												// Set y for sprite 0
+	sty $D003												// Set y for sprite 1
+	sty $D005												// Set y for sprite 2
+	sty $D007												// Set y for sprite 3
+	sty $D009												// Set y for sprite 4
+	sty $D00B												// Set y for sprite 5
+	sty $D00D												// Set y for sprite 6
+	sty $D00F												// Set y for sprite 7
+
+	ldy #$0E												// Sprite colors to blue
+	sty $D027
+	sty $D028
+	sty $D029
+	sty $D02A
+	sty $D02B
+	sty $D02C
+	sty $D02D
+	sty $D02E
+
+
 .if (DEBUG==1) {
 	lda #$00
 	sta $d020
@@ -699,6 +784,7 @@ scroller_render_offset:
 	lsr
 	sta scroller_character_mask + 1
 
+
 	rts
 
 
@@ -754,6 +840,12 @@ checkboard_sprite:
 .byte 97,134,24
 .byte 195,12,48
 .byte 134,24,97
+
+// Top scroller background
+scroller_back_top:
+.byte $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$05,$00,$50,$1F,$41,$F4,$5F,$55,$F5,$8F
+
+
 
 // Cosine to animate sprite background
 x_sprite_cos_pos:
