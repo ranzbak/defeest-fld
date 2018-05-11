@@ -28,19 +28,20 @@ BasicUpstart2(begin)        // <- This creates a basic sys line that can start y
 .const REG_ZERO_FD         = $fd                // Zero page cache
 
 // constants
-.const C_SCREEN_RAM        = $0400              // screen RAM
+.const C_SCREEN_BANK       = $4000              // screen bank base address
+.const C_SCREEN_RAM        = C_SCREEN_BANK + $0400 // screen RAM
 .const C_COLOUR_RAM        = $d800              // colour ram
-.const C_CHARSET           = $3800              // Alternate Character bank
-.const C_CHARSET_HIGH      = $3900              // Arternate Character bank HI
+.const C_CHARSET           = C_SCREEN_BANK + $3800 // Alternate Character bank
+.const C_CHARSET_HIGH      = C_SCREEN_BANK + $3900 // Arternate Character bank HI
 
 
 // Koala resource
 .var picture = LoadBinary("defeest-fullscreen.kla", BF_KOALA)
-*=$0C00 "ScreenRam";      .fill picture.getScreenRamSize(), picture.getScreenRam(i)
-*=$1C00 "ColorRam:"; colorRam:  .fill picture.getColorRamSize(), picture.getColorRam(i)
-*=$2000 "Bitmap";       .fill picture.getBitmapSize(), picture.getBitmap(i)
+*=C_SCREEN_BANK + $C00 "ScreenRam";      .fill picture.getScreenRamSize(), picture.getScreenRam(i)
+*=C_SCREEN_BANK + $1C00 "ColorRam:"; colorRam:  .fill picture.getColorRamSize(), picture.getColorRam(i)
+*=C_SCREEN_BANK + $2000 "Bitmap";       .fill picture.getBitmapSize(), picture.getBitmap(i)
 
-* = $1000 "Main Program"
+* = $2000 "Main Program"
 // Let the code begin
 begin:
   // create initial interrupt
@@ -59,36 +60,35 @@ begin:
   sta REG_INTSERVICE_LOW
   stx REG_INTSERVICE_HIGH
 
-  // Initial screen memory setup
-  //lda #%00010110        // $1800-1ffff char mem, $0400-07ff screen mem
-  lda #%00011010          // $2800-1ffff char mem, $0400-07ff screen mem
-  sta REG_MEMSETUP
+	// Switch SID bank to $8000-$bfff
+	lda #%00000010
+	sta $DD00 // SPINDLE: For Spindle change to $DD02
 
   // Setup background sprites
   lda #$20                // Using block 32 for Sprite 0-6
-  sta $7f8
-  sta $ff8
-  sta $7f9
-  sta $ff9
-  sta $7fa
-  sta $ffa
-  sta $7fb
-  sta $ffb
-  sta $7fc
-  sta $ffc
-  sta $7fd
-  sta $ffd
-  sta $7fe
-  sta $ffe
-  sta $7ff
-  sta $fff
+  sta C_SCREEN_BANK + $7f8							  // offset $0400
+  sta C_SCREEN_BANK + $ff8								// offset $0C00
+  sta C_SCREEN_BANK + $7f9
+  sta C_SCREEN_BANK + $ff9
+  sta C_SCREEN_BANK + $7fa
+  sta C_SCREEN_BANK + $ffa
+  sta C_SCREEN_BANK + $7fb
+  sta C_SCREEN_BANK + $ffb
+  sta C_SCREEN_BANK + $7fc
+  sta C_SCREEN_BANK + $ffc
+  sta C_SCREEN_BANK + $7fd
+  sta C_SCREEN_BANK + $ffd
+  sta C_SCREEN_BANK + $7fe
+  sta C_SCREEN_BANK + $ffe
+  sta C_SCREEN_BANK + $7ff
+  sta C_SCREEN_BANK + $fff
 
   ldx #0                  // Copy sprite into sprite memory
 !loop:
   lda checkboard_sprite, x
-  sta $0800, x
+  sta C_SCREEN_BANK + $800, x
   lda scroller_back_top, x
-  sta $0800 + 64, x
+  sta C_SCREEN_BANK + $800 + 64, x
   inx
   cpx #63
   bne !loop-
@@ -206,7 +206,7 @@ sync_intro:
   bne loop1
 
   lda #$ff                        // init video garbage
-  sta $3fff                       // fill to highlight fld for debugging
+  sta C_SCREEN_BANK + $3fff                       // fill to highlight fld for debugging
 
   jsr setup_charset
 
@@ -234,9 +234,9 @@ sync_intro:
 !loop:
   lda header_text, x
   beq !over+
-  sta $0400, x
+  sta C_SCREEN_BANK + $400, x
   lda footer_text, x
-  sta $680, x
+  sta C_SCREEN_BANK + $680, x
   inx
   jmp !loop-
 !over:
@@ -306,28 +306,28 @@ bitmap_top_fld_done:
   and #007
   adc #$38                        // %00111000
   sta REG_SCREENCTL_1
-  lda #%00111000                  // $2000-$3fff bitmap mem, $0c00-$0fff screen mem
+  lda #%00111000                  // $2000-$3fff bitmap mem, charmem $2000, $0c00-$0fff screen mem
   sta REG_MEMSETUP
   lda #$d8                        // switch multi colour mode on
   sta REG_SCREENCTL_2
 
   lda #$20                        // Set sprites back to position 32
-  sta $7f8
-  sta $ff8
-  sta $7f9
-  sta $ff9
-  sta $7fa
-  sta $ffa
-  sta $7fb
-  sta $ffb
-  sta $7fc
-  sta $ffc
-  sta $7fd
-  sta $ffd
-  sta $7fe
-  sta $ffe
-  sta $7ff
-  sta $fff
+  sta C_SCREEN_BANK + $7f8
+  sta C_SCREEN_BANK + $ff8
+  sta C_SCREEN_BANK + $7f9
+  sta C_SCREEN_BANK + $ff9
+  sta C_SCREEN_BANK + $7fa
+  sta C_SCREEN_BANK + $ffa
+  sta C_SCREEN_BANK + $7fb
+  sta C_SCREEN_BANK + $ffb
+  sta C_SCREEN_BANK + $7fc
+  sta C_SCREEN_BANK + $ffc
+  sta C_SCREEN_BANK + $7fd
+  sta C_SCREEN_BANK + $ffd
+  sta C_SCREEN_BANK + $7fe
+  sta C_SCREEN_BANK + $ffe
+  sta C_SCREEN_BANK + $7ff
+  sta C_SCREEN_BANK + $fff
 
 .if (DEBUG==1) {
   lda #$00
@@ -417,22 +417,22 @@ latch_final_bitmap_line:
 
   // Set sprites to the scroller background
   lda #$21                        // Set sprites back to position 33
-  sta $7f8
-  sta $ff8
-  sta $7f9
-  sta $ff9
-  sta $7fa
-  sta $ffa
-  sta $7fb
-  sta $ffb
-  sta $7fc
-  sta $ffc
-  sta $7fd
-  sta $ffd
-  sta $7fe
-  sta $ffe
-  sta $7ff
-  sta $fff
+  sta C_SCREEN_BANK + $7f8
+  sta C_SCREEN_BANK + $ff8
+  sta C_SCREEN_BANK + $7f9
+  sta C_SCREEN_BANK + $ff9
+  sta C_SCREEN_BANK + $7fa
+  sta C_SCREEN_BANK + $ffa
+  sta C_SCREEN_BANK + $7fb
+  sta C_SCREEN_BANK + $ffb
+  sta C_SCREEN_BANK + $7fc
+  sta C_SCREEN_BANK + $ffc
+  sta C_SCREEN_BANK + $7fd
+  sta C_SCREEN_BANK + $ffd
+  sta C_SCREEN_BANK + $7fe
+  sta C_SCREEN_BANK + $ffe
+  sta C_SCREEN_BANK + $7ff
+  sta C_SCREEN_BANK + $fff
 
   // Enable multicolor mode sprite 0-7
   ldy #$ff
@@ -724,8 +724,8 @@ save_scroller_index:
 
   ldy #>C_CHARSET                 // determine if character is in the low/high section of the charset
   cmp #031
-  bcc calc_scrollchar_src_low
-  ldy #>C_CHARSET_HIGH
+	bcc calc_scrollchar_src_low
+	ldy #>C_CHARSET_HIGH
 
 calc_scrollchar_src_low:
   and #031                        // calculate offset into char set for character bytes
